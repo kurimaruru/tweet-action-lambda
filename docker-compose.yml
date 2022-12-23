@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  dynamodb-local:
+    container_name: dynamodb-local
+    image: amazon/dynamodb-local:latest
+    user: root
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /data
+    volumes:
+      - dynamodb-local-data:/data
+    ports:
+      - 8000:8000
+    networks:
+      - dynamodb-local-network
+
+  dynamodb-admin:
+    container_name: dynamodb-admin
+    image: aaronshaf/dynamodb-admin:latest
+    environment:
+      - DYNAMO_ENDPOINT=dynamodb-local:8000
+    ports:
+      - 8001:8001
+    depends_on:
+      - dynamodb-local
+    networks:
+      - dynamodb-local-network
+
+  minio:
+    image: minio/minio:RELEASE.2020-11-13T20-10-18Z
+    ports:
+      - '${MINIO_PORT}:9000'
+    volumes:
+      - type: volume
+        source: minio_lambda
+        target: /data
+        volume:
+          nocopy: true
+    command: server /data/data{1...4}
+    env_file:
+      - ./.env
+    networks:
+      - default
+      - minio-app
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+
+  minio_client:
+    image: minio/mc:RELEASE.2020-10-03T02-54-56Z
+    env_file:
+      - ./.env
+    volumes:
+      - type: bind
+        source: ./s3/minio_client
+        target: /minio
+    depends_on:
+      - minio
+    entrypoint: /bin/sh /minio/entrypoint.sh
+
+  lambda-app:
+    container_name: lambda-app
+    build: .
+    ports:
+      - '8080:8080'
+    depends_on:
+      - 'dynamodb-local'
+      - 'minio'
+    networks:
+      - dynamodb-local-network
+    links:
+      - 'dynamodb-local'
+    env_file:
+      - .env
+volumes:
+  dynamodb-local-data:
+  minio_lambda:
+
+networks:
+  dynamodb-local-network:
+    driver: bridge
+  minio-app:
+    external: true

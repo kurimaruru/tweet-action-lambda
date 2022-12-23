@@ -1,0 +1,14 @@
+{
+  "Rules": [
+    {
+      "Expiration": {
+        "Day": 1
+      },
+      "ID": "table_detection",
+      "Filter": {
+        "Prefix": "cache/"
+      },
+      "Status": "Enabled"
+    }
+  ]
+}
